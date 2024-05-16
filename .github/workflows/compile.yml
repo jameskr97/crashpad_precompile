@@ -1,0 +1,34 @@
+name: Crashpad Precompile
+on: [push, pull_request]
+jobs: 
+    linux:
+      runs-on: ubuntu-latest
+      steps:
+        - name: Install Dependencies
+          run: sudo apt update -y && sudo apt install -y build-essential zlib1g-dev libcurl4-openssl-dev jq
+
+        - name: Checkout depot_tools
+          run: git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git --depth=1
+
+        - name: Add depot_tools to PATH
+          run: echo "$(pwd)/depot_tools" >> $GITHUB_PATH
+
+        - name: Checkout Source
+          uses: actions/checkout@v4
+          with:
+            path: 'precompile'
+
+        - name: Copy .gclient file
+          run: cp precompile/gclient .gclient
+
+        - name: Checkout Crashpad
+          run: gclient sync
+
+        - name: Generate build files
+          working-directory: crashpad
+          run: gn gen out/Default --args='target_os="linux" target_cpu="x64" clang_path="//third_party/linux/clang/linux-amd64" target_sysroot="//third_party/linux/sysroot" is_debug=false'
+
+        - name: Build Crashpad
+          working-directory: crashpad
+          run: ninja -C out/Default crashpad_handler
+        
