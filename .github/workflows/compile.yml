@@ -3,14 +3,14 @@ name: Crashpad Precompile
 on: [push, pull_request]
 jobs: 
     unix:
-      name: ${{ matrix.cfg.name }}
+      name: ${{ matrix.cfg.name }} amd64
       runs-on: ${{ matrix.cfg.os }}
       strategy:
         fail-fast: false
         matrix:
           cfg:
-            - { os: ubuntu-latest, name: "Linux amd64", target_cpu: "x64", artifact: "lib/linux/amd64"}
-            - { os: macos-latest,  name: "macOS x64",   target_cpu: "x64", artifact: "lib/macos/amd64"}
+            - { os: ubuntu-latest, name: "Linux", target_cpu: "x64", artifact: "lib/linux/amd64", upload_include: True}
+            - { os: macos-latest,  name: "macOS", target_cpu: "x64", artifact: "lib/macos/amd64", upload_include: False}
       steps:
         - name: Install Dependencies (Linux)
           if: runner.os == 'Linux'
@@ -32,10 +32,14 @@ jobs:
             path: 'precompile'
 
         - name: Copy .gclient file
-          run: cp precompile/gclient .gclient
+          run: cp precompile/.ci/gclient .gclient
 
         - name: Checkout Crashpad
           run: gclient sync
+
+        - name: Get short crashpad commit hash
+          id: crashhash
+          run: echo "::set-output name=hash::$(git rev-parse --short HEAD)"
 
         - name: Generate build files (Linux)
           if: runner.os == 'Linux'
@@ -50,6 +54,36 @@ jobs:
         - name: Build Crashpad
           working-directory: crashpad
           run: ninja -C out/Default crashpad_handler
+
+        - name: Prepare artifact directory (all)
+          run: |
+            mkdir -p /tmp/crashpad/${{ matrix.cfg.artifact }}
+            mkdir -p /tmp/crashpad/bin/${{ matrix.cfg.name }}.${{ matrix.cfg.target_cpu }}
+            # Copy crashpad binaries
+            cp crashpad/out/Default/crashpad_handler /tmp/crashpad/bin/${{ matrix.cfg.name }}.${{ matrix.cfg.target_cpu }}
+            cp crashpad/out/Default/obj/client/libclient.a /tmp/crashpad/${{ matrix.cfg.artifact }}/libclient.a
+            cp crashpad/out/Default/obj/client/libcommon.a /tmp/crashpad/${{ matrix.cfg.artifact }}/libcommon.a
+            cp crashpad/out/Default/obj/util/libutil.a /tmp/crashpad/${{ matrix.cfg.artifact }}/libutil.a
+            cp crashpad/out/Default/obj/third_party/mini_chromium/mini_chromium/base/libbase.a /tmp/crashpad/${{ matrix.cfg.artifact }}/libbase.a
+
+        - name: Prepare artifact directory (mac)
+          if: runner.os == 'macOS'
+          run: |
+            # copy mac specific crashpad binaries
+            cp crashpad/out/Default/obj/BUILD_DIR/gen/util/mach/mig_output.child_portServer.o /tmp/crashpad/${{ matrix.cfg.artifact }}/mig_output.child_portServer.o
+            cp crashpad/out/Default/obj/BUILD_DIR/gen/util/mach/mig_output.child_portUser.o /tmp/crashpad/${{ matrix.cfg.artifact }}/mig_output.child_portUser.o
+            cp crashpad/out/Default/obj/BUILD_DIR/gen/util/mach/mig_output.notifyUser.o /tmp/crashpad/${{ matrix.cfg.artifact }}/mig_output.excServer.o
+            cp crashpad/out/Default/obj/BUILD_DIR/gen/util/mach/mig_output.excServer.o /tmp/crashpad/${{ matrix.cfg.artifact }}/mig_output.excUser.o
+            cp crashpad/out/Default/obj/BUILD_DIR/gen/util/mach/mig_output.excUser.o /tmp/crashpad/${{ matrix.cfg.artifact }}/mig_output.mach_excServer.o
+            cp crashpad/out/Default/obj/BUILD_DIR/gen/util/mach/mig_output.notifyServer.o /tmp/crashpad/${{ matrix.cfg.artifact }}/mig_output.mach_excUser.o
+            cp crashpad/out/Default/obj/BUILD_DIR/gen/util/mach/mig_output.mach_excUser.o /tmp/crashpad/${{ matrix.cfg.artifact }}/mig_output.notifyServer.o
+            cp crashpad/out/Default/obj/BUILD_DIR/gen/util/mach/mig_output.mach_excServer.o /tmp/crashpad/${{ matrix.cfg.artifact }}/mig_output.notifyUser.o
+
+        - name: Upload artifacts
+          uses: actions/upload-artifact@v4
+          with:
+            name: crashpad-${{ matrix.cfg.name }}-${{ matrix.cfg.target_cpu }}
+            path: /tmp/crashpad
 
     windows:
       name: ${{ matrix.cfg.name }}
@@ -74,7 +108,7 @@ jobs:
             path: 'precompile'
 
         - name: Copy .gclient file
-          run: cp precompile/gclient .gclient
+          run: cp precompile/.ci/gclient .gclient
 
         - name: Configure MSBuild
           uses: ilammy/msvc-dev-cmd@v1
