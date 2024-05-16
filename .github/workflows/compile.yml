@@ -2,15 +2,15 @@
 name: Crashpad Precompile
 on: [push, pull_request]
 jobs: 
-    linux:
+    unix:
       name: ${{ matrix.cfg.name }}
       runs-on: ${{ matrix.cfg.os }}
       strategy:
         fail-fast: false
         matrix:
           cfg:
-            - { os: ubuntu-latest, name: "Linux x64" }
-            - { os: macos-latest, name: "macOS x64" }
+            - { os: ubuntu-latest, name: "Linux amd64", target_cpu: "x64", artifact: "lib/linux/amd64"}
+            - { os: macos-latest,  name: "macOS x64",   target_cpu: "x64", artifact: "lib/macos/amd64"}
       steps:
         - name: Install Dependencies (Linux)
           if: runner.os == 'Linux'
@@ -40,7 +40,7 @@ jobs:
         - name: Generate build files (Linux)
           if: runner.os == 'Linux'
           working-directory: crashpad
-          run: gn gen out/Default --args='target_cpu="x64" clang_path="//third_party/linux/clang/linux-amd64" target_sysroot="//third_party/linux/sysroot" is_debug=false'
+          run: gn gen out/Default --args='target_cpu="${{ matrix.cfg.target_cpu }}" clang_path="//third_party/linux/clang/linux-amd64" target_sysroot="//third_party/linux/sysroot" is_debug=false'
 
         - name: Generate build files (macOS)
           working-directory: crashpad
@@ -50,10 +50,17 @@ jobs:
         - name: Build Crashpad
           working-directory: crashpad
           run: ninja -C out/Default crashpad_handler
-    
-    windows-x64:
-      name: Windows x64
-      runs-on: windows-latest
+
+    windows:
+      name: ${{ matrix.cfg.name }}
+      runs-on: ${{ matrix.cfg.os }}
+      strategy:
+        fail-fast: false
+        matrix:
+          cfg:
+            # arch is for ilammy/msvc-dev-cmd, because it won't accept i386 as input, and target_cpu is for gn
+            - { os: windows-latest, name: "Windows i386",  arch: "x86", artifact: "lib/windows/i386"}
+            - { os: windows-latest, name: "Windows amd64", arch: "x64", artifact: "lib/windows/amd64"}
       steps:
         - name: Checkout depot_tools
           run: git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git --depth=1
@@ -69,12 +76,17 @@ jobs:
         - name: Copy .gclient file
           run: cp precompile/gclient .gclient
 
+        - name: Configure MSBuild
+          uses: ilammy/msvc-dev-cmd@v1
+          with:
+            arch: ${{ matrix.cfg.arch }}
+
         - name: Checkout Crashpad
           run: gclient sync
 
         - name: Generate build files
           working-directory: crashpad
-          run: gn gen out/Default --args='target_cpu=\"x64\"'
+          run: gn gen out/Default --args='target_cpu=\"${{ matrix.cfg.arch }}\"'
 
         - name: Build Crashpad
           working-directory: crashpad
