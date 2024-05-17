@@ -38,11 +38,6 @@ jobs:
         - name: Checkout Crashpad
           run: gclient sync
 
-        - name: Get short crashpad commit hash
-          run: |
-            echo "$(git log -1 --pretty=format:'[%h][%an][%ar]: %s')" >> $GITHUB_STEP_SUMMARY
-
-
         - name: Generate build files (Linux)
           if: runner.os == 'Linux'
           working-directory: crashpad
@@ -92,15 +87,15 @@ jobs:
             path: /tmp/crashpad
 
     windows:
-      name: ${{ matrix.cfg.name }}
+      name: Windows ${{ matrix.cfg.arch }}
       runs-on: ${{ matrix.cfg.os }}
       strategy:
         fail-fast: false
         matrix:
           cfg:
             # arch is for ilammy/msvc-dev-cmd, because it won't accept i386 as input, and target_cpu is for gn
-            - { os: windows-latest, name: "Windows i386",  arch: "x86", artifact: "lib/windows/i386"}
-            - { os: windows-latest, name: "Windows amd64", arch: "x64", artifact: "lib/windows/amd64"}
+            - { os: windows-latest, arch: "x86", artifact: "lib/windows/i386"}
+            - { os: windows-latest, arch: "x64", artifact: "lib/windows/amd64"}
       steps:
         - name: Checkout depot_tools
           run: git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git --depth=1
@@ -131,3 +126,24 @@ jobs:
         - name: Build Crashpad
           working-directory: crashpad
           run: ninja -C out/Default crashpad_handler
+
+        - name: Prepare artifact directory (all)
+          run: |
+            # Create directories
+            New-Item -ItemType Directory -Force -Path "${{github.workspace}}\gha-dist\${{ matrix.cfg.artifact }}"
+            New-Item -ItemType Directory -Force -Path "${{github.workspace}}\gha-dist\bin\${{ matrix.cfg.name }}.${{ matrix.cfg.target_cpu }}"
+
+            # Copy crashpad_handler
+            Copy-Item -Path "${{github.workspace}}\crashpad\out\Default\crashpad_handler.exe" -Destination "${{github.workspace}}\gha-dist\bin\${{ matrix.cfg.name }}.${{ matrix.cfg.target_cpu }}"
+
+            # Copy lib objects
+            Copy-Item -Path "${{github.workspace}}\crashpad\out\Default\obj\client\client.lib" -Destination "${{github.workspace}}\gha-dist\${{ matrix.cfg.artifact }}\client.lib"
+            Copy-Item -Path "${{github.workspace}}\crashpad\out\Default\obj\client\common.lib" -Destination "${{github.workspace}}\gha-dist\${{ matrix.cfg.artifact }}\common.lib"
+            Copy-Item -Path "${{github.workspace}}\crashpad\out\Default\obj\util\util.lib" -Destination "${{github.workspace}}\gha-dist\${{ matrix.cfg.artifact }}\util.lib"
+            Copy-Item -Path "${{github.workspace}}\crashpad\out\Default\obj\third_party\mini_chromium\mini_chromium\base\base.lib" -Destination "${{github.workspace}}\gha-dist\${{ matrix.cfg.artifact }}\base.lib"
+
+        - name: Upload artifacts
+          uses: actions/upload-artifact@v4
+          with:
+            name: crashpad-windows-${{ matrix.cfg.arch }}
+            path: ${{github.workspace}}\gha-dist
