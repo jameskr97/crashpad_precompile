@@ -38,8 +38,9 @@ jobs:
           run: gclient sync
 
         - name: Get short crashpad commit hash
-          id: crashhash
-          run: echo "::set-output name=hash::$(git -C crashpad rev-parse --short HEAD)"
+          run: |
+            echo "$(git log -1 --pretty=format:'[%h][%an][%ar]: %s')" >> $GITHUB_STEP_SUMMARY
+
 
         - name: Generate build files (Linux)
           if: runner.os == 'Linux'
