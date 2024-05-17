@@ -147,3 +147,44 @@ jobs:
           with:
             name: crashpad-windows-${{ matrix.cfg.arch }}
             path: ${{github.workspace}}\gha-dist
+
+    dist:
+      name: Combine and Distribute
+      runs-on: ubuntu-latest
+      needs: [unix, windows]
+      steps:
+        - name: Checkout Source
+          uses: actions/checkout@v4
+          with:
+            path: 'precompile'
+
+        - run: git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git --depth=1
+        - run: echo "$(pwd)/depot_tools" >> $GITHUB_PATH
+        - run: cp precompile/.ci/gclient .gclient
+        - run: gclient sync --deps=mac,linux,win
+
+        - name: Download artifacts
+          uses: actions/download-artifact@v4
+          with:
+            path: ${{github.workspace}}/precompile/packer/artifacts
+            merge-multiple: true
+
+        - name: Get crashpad hash
+          run: echo "CRASHPAD_HASH=$(git -C crashpad rev-parse --short HEAD)" >> $GITHUB_ENV
+
+        - name: Package artifacts
+          working-directory: ${{github.workspace}}/precompile/packer
+          env:
+            DIST_TYPE: universal
+            CRASHPAD_SOURCE_DIR: ${{github.workspace}}/crashpad
+            MINI_CHROMIUM_SOURCE_DIR: ${{github.workspace}}/crashpad/third_party/mini_chromium/mini_chromium
+          run: |
+            mkdir build
+            cd build && cmake ..
+            cpack
+
+        - name: Upload artifacts
+          uses: actions/upload-artifact@v4
+          with:
+            name: dist
+            path: ${{github.workspace}}/precompile/packer
