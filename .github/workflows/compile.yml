@@ -3,14 +3,15 @@ name: Crashpad Precompile
 on: [push, pull_request]
 jobs: 
     unix:
-      name: ${{ matrix.cfg.name }} amd64
+      name: ${{ matrix.cfg.name }} ${{ matrix.cfg.target_cpu }}
       runs-on: ${{ matrix.cfg.os }}
       strategy:
         fail-fast: false
         matrix:
           cfg:
-            - { os: ubuntu-latest, name: "Linux", target_cpu: "x64", artifact: "lib/linux/amd64", upload_include: True}
-            - { os: macos-latest,  name: "macOS", target_cpu: "x64", artifact: "lib/macos/amd64", upload_include: False}
+            - { os: ubuntu-latest, name: "Linux", target_cpu: "x64",   artifact: "lib/linux/amd64", upload_include: True}
+            - { os: macos-latest,  name: "macOS", target_cpu: "x64",   artifact: "lib/macos/amd64", upload_include: False}
+            - { os: macos-latest,  name: "macOS", target_cpu: "arm64", artifact: "lib/macos/arm64", upload_include: False}
       steps:
         - name: Install Dependencies (Linux)
           if: runner.os == 'Linux'
@@ -50,7 +51,7 @@ jobs:
         - name: Generate build files (macOS)
           working-directory: crashpad
           if: runner.os == 'macOS'
-          run: gn gen out/Default --args='target_cpu="x64" is_debug=false'
+          run: gn gen out/Default --args='target_cpu="${{ matrix.cfg.target_cpu }}" is_debug=false'
 
         - name: Build Crashpad
           working-directory: crashpad
@@ -58,10 +59,15 @@ jobs:
 
         - name: Prepare artifact directory (all)
           run: |
+            # Create directories
             mkdir -p /tmp/crashpad/${{ matrix.cfg.artifact }}
             mkdir -p /tmp/crashpad/bin/${{ matrix.cfg.name }}.${{ matrix.cfg.target_cpu }}
-            # Copy crashpad binaries
+
+            # Copy crashpad_handler and set permissions
             cp crashpad/out/Default/crashpad_handler /tmp/crashpad/bin/${{ matrix.cfg.name }}.${{ matrix.cfg.target_cpu }}
+            chmod +x /tmp/crashpad/bin/${{ matrix.cfg.name }}.${{ matrix.cfg.target_cpu }}/crashpad_handler
+
+            # Copy lib objects
             cp crashpad/out/Default/obj/client/libclient.a /tmp/crashpad/${{ matrix.cfg.artifact }}/libclient.a
             cp crashpad/out/Default/obj/client/libcommon.a /tmp/crashpad/${{ matrix.cfg.artifact }}/libcommon.a
             cp crashpad/out/Default/obj/util/libutil.a /tmp/crashpad/${{ matrix.cfg.artifact }}/libutil.a
@@ -70,7 +76,6 @@ jobs:
         - name: Prepare artifact directory (mac)
           if: runner.os == 'macOS'
           run: |
-            # copy mac specific crashpad binaries
             cp crashpad/out/Default/obj/BUILD_DIR/gen/util/mach/mig_output.child_portServer.o /tmp/crashpad/${{ matrix.cfg.artifact }}/mig_output.child_portServer.o
             cp crashpad/out/Default/obj/BUILD_DIR/gen/util/mach/mig_output.child_portUser.o /tmp/crashpad/${{ matrix.cfg.artifact }}/mig_output.child_portUser.o
             cp crashpad/out/Default/obj/BUILD_DIR/gen/util/mach/mig_output.notifyUser.o /tmp/crashpad/${{ matrix.cfg.artifact }}/mig_output.excServer.o
