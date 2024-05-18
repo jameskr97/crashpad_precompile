@@ -9,7 +9,7 @@ set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-$ENV{CRASHPAD_HASH}-$ENV{DIST
 include(CPack)
 
 list(APPEND CRASHPAD_GENERATED_HEADER_FILES
-    $ENV{CRASHPAD_SOURCE_DIR}/out/Default/build/chromeos_buildflags.h
+    $ENV{GENERATED_HEADERS_DIR}/build/chromeos_buildflags.h
 )
 
 list(APPEND CRASHPAD_HEADER_FILES
@@ -21,7 +21,6 @@ list(APPEND CRASHPAD_HEADER_FILES
     $ENV{CRASHPAD_SOURCE_DIR}/client/simulate_crash_mac.h
     $ENV{CRASHPAD_SOURCE_DIR}/client/simulate_crash_win.h
     $ENV{CRASHPAD_SOURCE_DIR}/client/simulate_crash_win.h
-    # $ENV{CRASHPAD_SOURCE_DIR}/util/misc/scoped_handle.h
     $ENV{CRASHPAD_SOURCE_DIR}/util/misc/initialization_state.h
     $ENV{CRASHPAD_SOURCE_DIR}/util/misc/uuid.h
     $ENV{CRASHPAD_SOURCE_DIR}/util/misc/capture_context.h
@@ -31,11 +30,12 @@ list(APPEND CRASHPAD_HEADER_FILES
     $ENV{CRASHPAD_SOURCE_DIR}/util/file/file_writer.h
     $ENV{CRASHPAD_SOURCE_DIR}/util/file/scoped_remove_file.h
     $ENV{CRASHPAD_SOURCE_DIR}/util/file/file_seeker.h
+    $ENV{CRASHPAD_SOURCE_DIR}/util/win/scoped_handle.h
 )
 
 list(APPEND MINI_CHROMIUM_HEADER_FILES
-    # $ENV{MINI_CHROMIUM_SOURCE_DIR}/build/build_config.h
-    # $ENV{MINI_CHROMIUM_SOURCE_DIR}/build/buildflag.h
+    $ENV{MINI_CHROMIUM_SOURCE_DIR}/build/build_config.h
+    $ENV{MINI_CHROMIUM_SOURCE_DIR}/build/buildflag.h
     $ENV{MINI_CHROMIUM_SOURCE_DIR}/base/apple/scoped_mach_port.h
     $ENV{MINI_CHROMIUM_SOURCE_DIR}/base/strings/string_piece.h
     $ENV{MINI_CHROMIUM_SOURCE_DIR}/base/files/scoped_file.h
@@ -55,7 +55,7 @@ endfunction()
 
 # Install the header files, preserving their directory structure
 install_files_preserve_structure(CRASHPAD_HEADER_FILES $ENV{CRASHPAD_SOURCE_DIR} include/crashpad)
-# install_files_preserve_structure(CRASHPAD_GENERATED_HEADER_FILES $ENV{CRASHPAD_SOURCE_DIR}/out/Default include/crashpad)
+install_files_preserve_structure(CRASHPAD_GENERATED_HEADER_FILES $ENV{GENERATED_HEADERS_DIR} include/crashpad)
 install_files_preserve_structure(MINI_CHROMIUM_HEADER_FILES $ENV{MINI_CHROMIUM_SOURCE_DIR} include/mini_chromium)
 
 # Set packaging installation paths

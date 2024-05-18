@@ -15,7 +15,7 @@ jobs:
       steps:
         - name: Install Dependencies (Linux)
           if: runner.os == 'Linux'
-          run: sudo apt update -y && sudo apt install -y build-essential zlib1g-dev libcurl4-openssl-dev jq
+          run: sudo apt update -y && sudo apt install -y build-essential zlib1g-dev libcurl4-openssl-dev
 
         - uses: actions/setup-python@v5
           with:
@@ -85,6 +85,13 @@ jobs:
           with:
             name: crashpad-${{ matrix.cfg.name }}-${{ matrix.cfg.target_cpu }}
             path: /tmp/crashpad
+
+        - name: Upload build header files
+          if: ${{ matrix.cfg.upload_include }}
+          uses: actions/upload-artifact@v4
+          with:
+            name: crashpad-unix-header
+            path: ${{github.workspace}}/crashpad/out/Default/gen/build/chromeos_buildflags.h
 
     windows:
       name: Windows ${{ matrix.cfg.arch }}
@@ -163,11 +170,19 @@ jobs:
         - run: cp precompile/.ci/gclient .gclient
         - run: gclient sync --deps=mac,linux,win
 
-        - name: Download artifacts
+        - name: Download precompiled artifacts
           uses: actions/download-artifact@v4
           with:
             path: ${{github.workspace}}/precompile/packer/artifacts
             merge-multiple: true
+
+        - name: Download linux header artifact
+          uses: actions/download-artifact@v4
+          with:
+            name: crashpad-unix-header
+            path: /tmp/crashpad/generated-headers-dir/build
+
+        - run: tree /tmp/crashpad/generated-headers-dir
 
         - name: Get crashpad hash
           run: echo "CRASHPAD_HASH=$(git -C crashpad rev-parse --short HEAD)" >> $GITHUB_ENV
@@ -178,6 +193,7 @@ jobs:
             DIST_TYPE: universal
             CRASHPAD_SOURCE_DIR: ${{github.workspace}}/crashpad
             MINI_CHROMIUM_SOURCE_DIR: ${{github.workspace}}/crashpad/third_party/mini_chromium/mini_chromium
+            GENERATED_HEADERS_DIR: /tmp/crashpad/generated-headers-dir
           run: |
             mkdir build
             cd build && cmake ..
@@ -186,5 +202,39 @@ jobs:
         - name: Upload artifacts
           uses: actions/upload-artifact@v4
           with:
-            name: dist
-            path: ${{github.workspace}}/precompile/packer
+            name: crashpad-precompiled-${{ env.CRASHPAD_HASH }}-${{ env.DIST_TYPE }}
+            path: ${{github.workspace}}/precompile/packer/build/*.zip
+
+    test:
+      name: Test Dist - ${{ matrix.cfg.name }} ${{ matrix.cfg.target_cpu }}
+      runs-on: ${{ matrix.cfg.os }}
+      needs: [dist]
+      strategy:
+        fail-fast: false
+        matrix:
+          cfg:
+            - { os: ubuntu-latest, name: "Linux", arch: "x64"}
+            - { os: macos-latest,  name: "macOS", arch: "x64"}
+            - { os: macos-latest,  name: "macOS", arch: "arm64"}
+      steps:
+        - run: sudo apt update -y && sudo apt install -y tree
+        - name: Checkout Source
+          uses: actions/checkout@v4
+          with:
+            path: 'precompile'
+
+        - name: Download artifacts
+          uses: actions/download-artifact@v4
+          with:
+            pattern: crashpad-precompiled-*
+            path: ${{github.workspace}}/precompile/test/build/libs/crashpad
+            merge-multiple: true
+
+        - run: tree ${{github.workspace}}/precompile/test/
+
+        - name: Build Test Project
+          working-directory: ${{github.workspace}}/precompile/test
+          run: |
+              mkdir build
+              cd build && cmake .. -A ${{ matrix.cfg.arch }}
+              make
