@@ -1,19 +1,35 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.14)
+project(crashpad-precompiled)
 
+message(STATUS "CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}")
 if(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64" AND WIN32)
+    message(STATUS "Compiling for Windows x86_64")
     set(PRECOMPILED_LIB_DIR "libs/windows/amd64")
+
 elseif(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86" AND WIN32)
+    message(STATUS "Compiling for Windows x86")
     set(PRECOMPILED_LIB_DIR "libs/windows/i386")
+
 elseif(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64" AND UNIX AND NOT APPLE)
+    message(STATUS "Compiling for Linux x86_64")
     set(PRECOMPILED_LIB_DIR "lib/linux/amd64")
+
 elseif(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64" AND APPLE)
+    message(STATUS "Compiling for macOS x86_64")
     set(PRECOMPILED_LIB_DIR "lib/macos/amd64")
+
 elseif(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "arm64" AND APPLE)
+    message(STATUS "Compiling for macOS arm64")
     set(PRECOMPILED_LIB_DIR "lib/macos/arm64")
+
 else()
     message(FATAL_ERROR "Unsupported operating system or architecture: ${CMAKE_SYSTEM_PROCESSOR}")
 endif()
 file(GLOB CRASHPAD_LIBS "${CMAKE_CURRENT_SOURCE_DIR}/${PRECOMPILED_LIB_DIR}/*")
+message(STATUS "Found the following crashpad libraries:")
+foreach(LIB ${CRASHPAD_LIBS})
+    message(STATUS "  ${LIB}")
+endforeach()
 
 add_library(crashpad INTERFACE)
 target_include_directories(crashpad INTERFACE include/crashpad)

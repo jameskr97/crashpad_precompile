@@ -6,6 +6,7 @@ project(crashpad)
 set(CPACK_GENERATOR "ZIP")
 set(CPACK_PACKAGE_NAME "crashpad")
 set(CPACK_PACKAGE_FILE_NAME $ENV{OUTPUT_FILE_NAME})
+set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
 include(CPack)
 
 list(APPEND CRASHPAD_GENERATED_HEADER_FILES
@@ -59,6 +60,6 @@ install_files_preserve_structure(CRASHPAD_GENERATED_HEADER_FILES $ENV{GENERATED_
 install_files_preserve_structure(MINI_CHROMIUM_HEADER_FILES $ENV{MINI_CHROMIUM_SOURCE_DIR} include/mini_chromium)
 
 # Set packaging installation paths
-install(DIRECTORY ${PROJECT_SOURCE_DIR}/artifacts/lib DESTINATION lib)
-install(FILES ${PROJECT_SOURCE_DIR}/DistCMakeLists.cmake DESTINATION . RENAME CMakelists.txt)
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/artifacts/lib DESTINATION .)
+install(FILES ${PROJECT_SOURCE_DIR}/DistCMakeLists.cmake DESTINATION . RENAME CMakeLists.txt)
 

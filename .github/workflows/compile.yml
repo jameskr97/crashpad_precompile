@@ -213,7 +213,7 @@ jobs:
             path: ${{github.workspace}}/precompile/packer/build/extracted
 
     test:
-      name: Test Dist - ${{ matrix.cfg.name }} ${{ matrix.cfg.target_cpu }}
+      name: Test Distribution - ${{ matrix.cfg.name }} ${{ matrix.cfg.target_cpu }}
       runs-on: ${{ matrix.cfg.os }}
       needs: [dist]
       strategy:
@@ -222,9 +222,9 @@ jobs:
           cfg:
             - { os: ubuntu-latest, name: "Linux", arch: "x64"}
             - { os: macos-latest,  name: "macOS", arch: "x64"}
-            - { os: macos-latest,  name: "macOS", arch: "arm64"}
       steps:
-        - run: sudo apt update -y && sudo apt install -y tree
+        - if: runner.os == 'Linux'
+          run: sudo apt update -y && sudo apt install -y tree
         - name: Checkout Source
           uses: actions/checkout@v4
           with:
@@ -233,15 +233,16 @@ jobs:
         - name: Download artifacts
           uses: actions/download-artifact@v4
           with:
-            pattern: crashpad-precompiled-*
-            path: ${{github.workspace}}/precompile/test/build/libs/crashpad
+            pattern: crashpad-precompiled
+            path: ${{github.workspace}}/precompile/test/libs/crashpad
             merge-multiple: true
 
         - run: tree ${{github.workspace}}/precompile/test/
+          if: runner.os == 'Linux'
 
         - name: Build Test Project
           working-directory: ${{github.workspace}}/precompile/test
           run: |
               mkdir -p build
-              cd build && cmake .. -A ${{ matrix.cfg.arch }}
+              cd build && cmake ..
               make

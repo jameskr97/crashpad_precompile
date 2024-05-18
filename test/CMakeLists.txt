@@ -7,5 +7,5 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_subdirectory(libs/crashpad)
 
 project(TestProject)
-add_executable(TestApp src/main.cpp)
+add_executable(TestApp main.cpp)
 target_link_libraries(TestApp PRIVATE crashpad)
