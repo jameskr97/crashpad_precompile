@@ -85,6 +85,7 @@ jobs:
           with:
             name: crashpad-${{ matrix.cfg.name }}-${{ matrix.cfg.target_cpu }}
             path: /tmp/crashpad
+            compression-level: 0 # No compression
 
         - name: Upload build header files
           if: ${{ matrix.cfg.upload_include }}
@@ -92,6 +93,7 @@ jobs:
           with:
             name: crashpad-unix-header
             path: ${{github.workspace}}/crashpad/out/Default/gen/build/chromeos_buildflags.h
+            if-no-files-found: error
 
     windows:
       name: Windows ${{ matrix.cfg.arch }}
@@ -184,13 +186,17 @@ jobs:
 
         - run: tree /tmp/crashpad/generated-headers-dir
 
-        - name: Get crashpad hash
-          run: echo "CRASHPAD_HASH=$(git -C crashpad rev-parse --short HEAD)" >> $GITHUB_ENV
+        - name: Set environment variables (DIST_TYPE, CRASHPAD_HASH)
+          run: |
+            echo "CRASHPAD_HASH=$(git -C crashpad rev-parse --short HEAD)" >> $GITHUB_ENV
+            echo "DIST_TYPE=universal" >> $GITHUB_ENV
 
-        - name: Package artifacts
+        - name: Set environment variables (OUTPUT_FILE_NAME)
+          run: echo "OUTPUT_FILE_NAME=crashpad-precompiled-${{env.CRASHPAD_HASH}}-${{env.DIST_TYPE}}" >> $GITHUB_ENV  
+
+        - name: Package artifacts and prepare for artifact upload
           working-directory: ${{github.workspace}}/precompile/packer
           env:
-            DIST_TYPE: universal
             CRASHPAD_SOURCE_DIR: ${{github.workspace}}/crashpad
             MINI_CHROMIUM_SOURCE_DIR: ${{github.workspace}}/crashpad/third_party/mini_chromium/mini_chromium
             GENERATED_HEADERS_DIR: /tmp/crashpad/generated-headers-dir
@@ -198,12 +204,13 @@ jobs:
             mkdir build
             cd build && cmake ..
             cpack
+            unzip ${{env.OUTPUT_FILE_NAME}}.zip -d extracted
 
         - name: Upload artifacts
           uses: actions/upload-artifact@v4
           with:
-            name: crashpad-precompiled-${{ env.CRASHPAD_HASH }}-${{ env.DIST_TYPE }}
-            path: ${{github.workspace}}/precompile/packer/build/*.zip
+            name: crashpad-precompiled
+            path: ${{github.workspace}}/precompile/packer/build/extracted
 
     test:
       name: Test Dist - ${{ matrix.cfg.name }} ${{ matrix.cfg.target_cpu }}
@@ -235,6 +242,6 @@ jobs:
         - name: Build Test Project
           working-directory: ${{github.workspace}}/precompile/test
           run: |
-              mkdir build
+              mkdir -p build
               cd build && cmake .. -A ${{ matrix.cfg.arch }}
               make
