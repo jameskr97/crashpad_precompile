@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.14)
 project(crashpad-precompiled)
 
 message(STATUS "CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}")
-if(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64" AND WIN32)
+if(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "AMD64" AND WIN32)
     message(STATUS "Compiling for Windows x86_64")
     set(PRECOMPILED_LIB_DIR "libs/windows/amd64")
 
@@ -32,9 +32,16 @@ foreach(LIB ${CRASHPAD_LIBS})
 endforeach()
 
 add_library(crashpad INTERFACE)
+target_compile_definitions(crashpad INTERFACE -DNOMINMAX)
+# set_source_files_properties(${CMAKE_CURRNENT_SOURCE_DIR}/include/mini_chromium/base/strings/string_piece.h PROPERTIES COMPILE_FLAGS -DNOMINMAX)
 target_include_directories(crashpad INTERFACE include/crashpad)
 target_include_directories(crashpad INTERFACE include/mini_chromium)
 target_link_libraries(crashpad INTERFACE ${CRASHPAD_LIBS})
+
+if(UNIX)
+	find_package(Threads REQUIRED)
+	target_link_libraries(crashpad INTERFACE Threads::Threads)
+endif()
 
 if(APPLE)
     find_library(MAC_FRAME_COCOA Cocoa)

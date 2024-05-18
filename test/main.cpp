@@ -8,8 +8,13 @@
 #include <filesystem>
 
 std::tuple<base::FilePath, base::FilePath, bool> getCrashpadInfo(){
-    base::FilePath handler{"./crashpad_handler"};
-    base::FilePath dataDir{"my-crash-data"};
+    #ifdef _WIN32
+        base::FilePath handler{L"./crashpad_handler"};
+        base::FilePath dataDir{L"my-crash-data"};
+    #else
+        base::FilePath handler{"./crashpad_handler"};
+        base::FilePath dataDir{"my-crash-data"};
+    #endif
 	const bool startHandlerFromBGThread = false; // not available, assert crash if true
     return {handler, dataDir, startHandlerFromBGThread};
 }

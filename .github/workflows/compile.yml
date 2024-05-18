@@ -2,7 +2,7 @@
 name: Crashpad Precompile
 on: [push, pull_request]
 jobs: 
-    unix:
+    compile-unix:
       name: ${{ matrix.cfg.name }} ${{ matrix.cfg.target_cpu }}
       runs-on: ${{ matrix.cfg.os }}
       strategy:
@@ -95,7 +95,7 @@ jobs:
             path: ${{github.workspace}}/crashpad/out/Default/gen/build/chromeos_buildflags.h
             if-no-files-found: error
 
-    windows:
+    compile-windows:
       name: Windows ${{ matrix.cfg.arch }}
       runs-on: ${{ matrix.cfg.os }}
       strategy:
@@ -157,10 +157,10 @@ jobs:
             name: crashpad-windows-${{ matrix.cfg.arch }}
             path: ${{github.workspace}}\gha-dist
 
-    dist:
+    generate-dist:
       name: Combine and Distribute
       runs-on: ubuntu-latest
-      needs: [unix, windows]
+      needs: [compile-unix, compile-windows]
       steps:
         - name: Checkout Source
           uses: actions/checkout@v4
@@ -212,10 +212,10 @@ jobs:
             name: crashpad-precompiled
             path: ${{github.workspace}}/precompile/packer/build/extracted
 
-    test:
+    unix-test:
       name: Test Distribution - ${{ matrix.cfg.name }} ${{ matrix.cfg.target_cpu }}
       runs-on: ${{ matrix.cfg.os }}
-      needs: [dist]
+      needs: [generate-dist]
       strategy:
         fail-fast: false
         matrix:
@@ -223,8 +223,10 @@ jobs:
             - { os: ubuntu-latest, name: "Linux", arch: "x64"}
             - { os: macos-latest,  name: "macOS", arch: "x64"}
       steps:
-        - if: runner.os == 'Linux'
-          run: sudo apt update -y && sudo apt install -y tree
+        - name: Install Dependencies (Linux)
+          if: runner.os == 'Linux'
+          run: sudo apt update -y && sudo apt install -y tree clang
+
         - name: Checkout Source
           uses: actions/checkout@v4
           with:
@@ -246,3 +248,44 @@ jobs:
               mkdir -p build
               cd build && cmake ..
               make
+    
+    windows-test:
+      needs: [generate-dist]
+      name: Test Distribution - Windows ${{ matrix.arch }}
+      strategy:
+        fail-fast: false
+        matrix:
+          arch: [x86, x64]
+      runs-on: windows-2019
+      steps:
+        - name: Checkout Source
+          uses: actions/checkout@v4
+          with:
+            path: precompile
+
+        - name: Install chocolatey packages (i386)
+          if: ${{ matrix.arch == 'x86' }}
+          run: choco install ninja -y --x86
+
+        - name: Install chocolatey packages (x64)
+          if: ${{ matrix.arch == 'x64' }}
+          run: choco install ninja -y
+
+        - name: Configure MSBuild
+          uses: ilammy/msvc-dev-cmd@v1
+          with:
+            arch: ${{ matrix.arch }}
+
+        - name: Download artifacts
+          uses: actions/download-artifact@v4
+          with:
+            pattern: crashpad-precompiled
+            path: ${{github.workspace}}/precompile/test/libs/crashpad
+            merge-multiple: true
+
+        - name: Generate CMake
+          working-directory: precompile/test
+          run: mkdir -p build && cd build && cmake -G Ninja ..
+
+        - name: Build Project
+          run: cmake --build precompile/test/build
