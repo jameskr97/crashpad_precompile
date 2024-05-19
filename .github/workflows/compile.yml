@@ -10,6 +10,7 @@ jobs:
         matrix:
           cfg:
             - { os: ubuntu-latest, name: "Linux", target_cpu: "x64",   artifact: "lib/linux/amd64", upload_include: True}
+            - { os: ubuntu-latest, name: "Linux", target_cpu: "arm64", artifact: "lib/linux/arm64", upload_include: False}
             - { os: macos-latest,  name: "macOS", target_cpu: "x64",   artifact: "lib/macos/amd64", upload_include: False}
             - { os: macos-latest,  name: "macOS", target_cpu: "arm64", artifact: "lib/macos/arm64", upload_include: False}
       steps:
